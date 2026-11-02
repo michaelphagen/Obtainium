@@ -6,6 +6,7 @@ String capitalizeFirst(String s) =>
 bool isObtainiumVariant(String id) =>
     id == obtainiumId ||
     id == '$obtainiumId.fdroid' ||
+    id == '$obtainiumId.wear' ||
     id == '$obtainiumId.debug';
 
 /// Builds a regex alternation pattern from a list of hostname strings,

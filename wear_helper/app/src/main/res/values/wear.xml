@@ -1,0 +1,6 @@
+<resources xmlns:tools="http://schemas.android.com/tools" tools:keep="@array/android_wear_capabilities">
+    <!-- The phone app looks for watches with this capability. -->
+    <string-array name="android_wear_capabilities" translatable="false">
+        <item>obtainium_wear_helper</item>
+    </string-array>
+</resources>
