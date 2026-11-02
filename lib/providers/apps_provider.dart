@@ -29,6 +29,7 @@ import 'package:obtainium/providers/apps_provider_install.dart';
 import 'package:obtainium/providers/apps_provider_lifecycle.dart';
 import 'package:obtainium/providers/apps_provider_updates.dart';
 
+import 'package:obtainium/services/watch_service.dart';
 import 'package:obtainium/utils/bg_update_guards.dart';
 import 'package:obtainium/utils/signing_cert_utils.dart';
 import 'package:obtainium/utils/translation_loader.dart';
@@ -705,6 +706,9 @@ Future<List<PackageInfo>> getAllInstalledInfo() async {
 }
 
 Future<PackageInfo?> getInstalledInfo(String? packageName) async {
+  if (isWatchId(packageName)) {
+    return WatchService.instance.installedInfo(packageName!);
+  }
   if (packageName != null) {
     try {
       return await packageManager.getPackageInfo(

@@ -373,6 +373,7 @@ abstract class AppSource {
           MapEntry(InstallerMode.shizuku.name, 'installMethodShizuku'),
           MapEntry(InstallerMode.external.name, 'installMethodExternal'),
           MapEntry(InstallerMode.root.name, 'installMethodRoot'),
+          MapEntry(InstallerMode.watch.name, 'installMethodWatch'),
         ],
         label: tr('installMethod'),
         required: false,

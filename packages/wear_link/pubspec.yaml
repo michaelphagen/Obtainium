@@ -1,0 +1,19 @@
+name: wear_link
+description: Talks to Obtainium's Wear OS watch helper over the Wear OS data layer.
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: ^3.12.0
+  flutter: ">=3.44.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: dev.imranr.obtainium.wearlink
+        pluginClass: WearLinkPlugin

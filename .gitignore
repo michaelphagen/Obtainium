@@ -56,4 +56,7 @@ data
 node_modules/
 
 # FVM Version Cache
-.fvm/
+.fvm/wear_helper/.gradle/
+wear_helper/build/
+wear_helper/app/build/
+wear_helper/local.properties

@@ -68,7 +68,9 @@ android {
     productFlavors {
         create("normal") {
             dimension = "default"
-            applicationIdSuffix = ""
+            // This fork installs next to Obtainium, and its Wear OS helper
+            // (wear_helper/) must use the same id to reach it.
+            applicationIdSuffix = ".wear"
         }
         create("fdroid") {
             dimension = "default"
