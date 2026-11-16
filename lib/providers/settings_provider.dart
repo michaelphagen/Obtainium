@@ -49,7 +49,7 @@ Locale? tryParseLocale(String? localeString) {
   return null;
 }
 
-enum InstallerMode { system, shizuku, external, root }
+enum InstallerMode { system, shizuku, external, root, watch }
 
 enum GroupByMode { none, category, source }
 

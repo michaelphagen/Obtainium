@@ -20,6 +20,7 @@ import 'package:obtainium/utils/update_health.dart';
 import 'package:obtainium/utils/locale_utils.dart';
 import 'package:obtainium/main.dart';
 import 'package:obtainium/utils/nav_helper.dart';
+import 'package:obtainium/services/watch_service.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher_string.dart';
@@ -764,7 +765,9 @@ class _AppPageState extends State<AppPage> {
 
   Widget _buildAppIcon(AppInMemory? app) {
     final icon = AppIcon(bytes: app?.icon, size: 56, radius: 14);
-    if (app == null || app.installedInfo == null) return icon;
+    if (app == null || app.installedInfo == null || isWatchId(app.app.id)) {
+      return icon;
+    }
     void openApp() {
       settingsProvider.lightImpact();
       packageManager.openApp(app.app.id);

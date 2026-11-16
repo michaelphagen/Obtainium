@@ -16,6 +16,7 @@ import 'package:obtainium/custom_errors.dart';
 import 'package:obtainium/installers/external_installer.dart';
 import 'package:obtainium/installers/installer.dart';
 import 'package:obtainium/installers/root_installer.dart';
+import 'package:obtainium/installers/watch_installer.dart';
 import 'package:obtainium/installers/shizuku_installer.dart';
 import 'package:obtainium/installers/stock_installer.dart';
 import 'package:obtainium/installers/install_utils.dart';
@@ -24,6 +25,7 @@ import 'package:obtainium/core/logging/app_logger.dart';
 import 'package:obtainium/providers/notifications_provider.dart';
 import 'package:obtainium/providers/settings_provider.dart';
 import 'package:obtainium/providers/source_provider.dart';
+import 'package:obtainium/services/watch_service.dart';
 import 'package:obtainium/utils/signing_cert_utils.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
@@ -79,7 +81,7 @@ bool shouldPollForInstallConfirmation(
   required bool needsBGWorkaround,
 }) {
   if (needsBGWorkaround) return false;
-  return installerModeKey != 'external';
+  return installerModeKey != 'external' && installerModeKey != 'watch';
 }
 
 /// The installer mode for [app]: its own `installerMode` setting when it sets
@@ -116,6 +118,8 @@ extension AppsProviderInstall on AppsProvider {
         return ExternalInstaller(settingsProvider);
       case 'root':
         return RootInstaller(settingsProvider);
+      case 'watch':
+        return WatchInstaller(settingsProvider);
       default:
         return StockInstaller(settingsProvider);
     }
@@ -132,12 +136,23 @@ extension AppsProviderInstall on AppsProvider {
     // If the APK package ID is different from the App ID, it is either new (using a placeholder ID) or the ID has changed
     // The former case should be handled (give the App its real ID), the latter is a security issue
     final isTempIdBool = isTempId(app);
-    final actualPackageName = newInfo.packageName;
+    final apkPackageName = newInfo.packageName;
+    final forWatch =
+        installerModeFor(app, settingsProvider.installerMode) == 'watch';
+    final actualPackageName = apkPackageName == null
+        ? null
+        : forWatch
+        ? toWatchId(apkPackageName)
+        : apkPackageName;
     if (app.id != actualPackageName) {
       if (actualPackageName == null) {
         throw ObtainiumError(tr('couldNotGetIdFromApk'))..url = app.url;
       }
-      if (apps[app.id] != null && !isTempIdBool && !app.allowIdChange) {
+      final onlyTargetChanged = watchBaseId(app.id) == apkPackageName;
+      if (apps[app.id] != null &&
+          !isTempIdBool &&
+          !app.allowIdChange &&
+          !onlyTargetChanged) {
         throw IDChangedError(actualPackageName)..url = app.url;
       }
       final idChangeWasAllowed = app.allowIdChange;
@@ -1012,6 +1027,7 @@ extension AppsProviderInstall on AppsProvider {
   }
 
   Future<void> uninstallApp(String appId) async {
+    if (isWatchId(appId)) return;
     final intent = AndroidIntent(
       action: 'android.intent.action.DELETE',
       data: 'package:$appId',
@@ -1207,6 +1223,7 @@ extension AppsProviderInstall on AppsProvider {
       id == obtainiumId ||
       id == obtainiumTempId ||
       id == '$obtainiumId.fdroid' ||
+      id == '$obtainiumId.wear' ||
       id == '$obtainiumId.debug';
 
   /// Downloads APKs for [appIds] and installs them, silently when possible.

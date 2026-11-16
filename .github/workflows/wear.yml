@@ -1,0 +1,119 @@
+name: Obtainium Wear
+
+# Builds this fork (Obtainium with a Wear OS watch install method) and its
+# watch helper, and releases both. The daily run first merges upstream
+# Obtainium's main branch (in the runner only; nothing is pushed), so a new
+# upstream release gets a matching Obtainium Wear release.
+
+on:
+  schedule:
+    - cron: "41 8 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Rebuild even if this version is already released
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wear
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Merge upstream Obtainium
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git remote add upstream https://github.com/ImranR98/Obtainium.git
+          git fetch --no-tags upstream main
+          git merge --no-edit upstream/main || { echo "::error::Upstream main doesn't merge cleanly; merge it by hand"; exit 1; }
+          echo "UPSTREAM_SHA=$(git rev-parse upstream/main)" >> "$GITHUB_ENV"
+
+      - name: Version
+        id: version
+        run: |
+          v="$(grep -oP '^version: \K[^+]+' pubspec.yaml)-wear$(tr -d '[:space:]' < WEAR_REVISION)"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          skip=false
+          if [ "${{ github.event_name }}" = schedule ] && gh release view "v$v" >/dev/null 2>&1; then skip=true; fi
+          if [ "${{ github.event_name }}" = workflow_dispatch ] && [ "${{ inputs.force }}" != true ] && gh release view "v$v" >/dev/null 2>&1; then skip=true; fi
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
+          echo "Obtainium Wear $v (skip=$skip)"
+
+      - uses: subosito/flutter-action@v2
+        if: steps.version.outputs.skip != 'true'
+        with:
+          channel: stable
+          cache: true
+
+      - uses: actions/setup-java@v4
+        if: steps.version.outputs.skip != 'true'
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.version.outputs.skip != 'true'
+        with:
+          gradle-version: "8.11.1"
+
+      - name: Signing key
+        if: steps.version.outputs.skip != 'true'
+        env:
+          KEYSTORE_B64: ${{ secrets.OBTAINIUM_WEAR_KEYSTORE_B64 }}
+          KEYSTORE_PASS: ${{ secrets.OBTAINIUM_WEAR_KEYSTORE_PASS }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ] && [ -n "$KEYSTORE_PASS" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/wear.jks"
+            printf '%s\n' "$KEYSTORE_PASS" | head -1 > "$RUNNER_TEMP/wear.pass"
+          elif [ "${{ github.event_name }}" = pull_request ]; then
+            echo "::warning::No signing secrets; signing this test build with a throwaway key"
+            echo throwaway-pass > "$RUNNER_TEMP/wear.pass"
+            keytool -genkeypair -keystore "$RUNNER_TEMP/wear.jks" -alias obtainiumwear -keyalg RSA -keysize 2048 \
+              -validity 30 -dname CN=throwaway -storepass throwaway-pass -keypass throwaway-pass
+          else
+            echo "::error::Add the OBTAINIUM_WEAR_KEYSTORE_B64 and OBTAINIUM_WEAR_KEYSTORE_PASS repository secrets"
+            exit 1
+          fi
+          echo "WEAR_KEYSTORE=$RUNNER_TEMP/wear.jks" >> "$GITHUB_ENV"
+          echo "WEAR_KEYSTORE_PASS_FILE=$RUNNER_TEMP/wear.pass" >> "$GITHUB_ENV"
+          echo "WEAR_KEY_ALIAS=obtainiumwear" >> "$GITHUB_ENV"
+          bt=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          echo "$bt" >> "$GITHUB_PATH"
+
+      - name: Build
+        if: steps.version.outputs.skip != 'true'
+        run: tool/wear_build.sh "$RUNNER_TEMP/out"
+
+      - name: Release
+        if: steps.version.outputs.skip != 'true' && github.event_name != 'pull_request'
+        run: |
+          v="${{ steps.version.outputs.version }}"
+          out="$RUNNER_TEMP/out"
+          gh release delete "v$v" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "v$v" "$out"/*.apk "$out"/*.sha256 --target "${{ github.sha }}" \
+            --title "Obtainium Wear $v" \
+            --notes "Obtainium ${v%-wear*} with a Wear OS watch install method. ObtainiumWear-*.apk goes on the phone, ObtainiumWearHelper-*.apk on the watch (first time with adb). Upstream: ${UPSTREAM_SHA:-not merged in this run}. sha256: $(cat "$out"/*.sha256 | tr '\n' ' ')"
+
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'pull_request' && steps.version.outputs.skip != 'true'
+        with:
+          name: apks
+          path: ${{ runner.temp }}/out/

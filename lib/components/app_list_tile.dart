@@ -18,6 +18,7 @@ import 'package:obtainium/providers/settings_provider.dart';
 import 'package:obtainium/providers/source_provider.dart';
 import 'package:obtainium/utils/update_health.dart';
 import 'package:obtainium/utils/nav_helper.dart';
+import 'package:obtainium/services/watch_service.dart';
 // AppsFilter and AppListBuilder are defined below in this file.
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher_string.dart';
@@ -194,7 +195,7 @@ class _AppIconWidgetState extends State<AppIconWidget> {
           ? tr('openApp', args: [labelName])
           : labelName,
       enabled: widget.installed,
-      onTap: widget.installed
+      onTap: widget.installed && !isWatchId(widget.appId)
           ? () => packageManager.openApp(widget.appId)
           : null,
       onLongPress: openDetails,
